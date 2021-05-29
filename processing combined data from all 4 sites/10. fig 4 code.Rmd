@@ -1,0 +1,46 @@
+---
+title: "Trip distance plots"
+author: "Jessica Phillips"
+date: "Feb 15, 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)# echo = False means code is not include
+
+x<-c("ggpubr","devtools","plyr","dplyr")
+lapply(x, require, character.only = TRUE)
+
+trip_info <- read.csv("4. trip max dist duration 210212.csv")
+trip_info$time_last_dive <- as.POSIXct(trip_info$time_last_dive)
+trip_info$time_first_dive <- as.POSIXct(trip_info$time_first_dive)
+
+trip_info$trip_duration <- difftime(trip_info$time_last_dive, trip_info$time_first_dive,units = c("days"))
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+```
+
+
+##Towards the end of incubation penguins anticipate hatching and go to closer locations 
+```{r start time,warning=FALSE,message=FALSE}
+no_incstart <- subset(trip_info,trip_info$stage!="inc at start")
+no_incstart$stage <- gsub("guard", "brood", no_incstart$stage)
+no_incstart$stage <- factor(no_incstart$stage,levels = c("incubation", "brood"))
+
+plot <- list()
+a=0
+for (i in unique(no_incstart$year)){
+  a=a+1
+  one_year <- subset(no_incstart,no_incstart$year==i)
+  
+  plot[[a]] <- ggplot(one_year, aes(x=time_first_dive, y=max_dist,color=stage)) +geom_point()+
+    scale_color_manual(limits=c("incubation","brood"),values=c(cbPalette[6],cbPalette[4]))+ 
+    geom_smooth(method=lm, se=TRUE)+
+          labs(title=i,size=11)+theme(axis.title.x=element_blank(),axis.title.y=element_blank())
+}
+
+print(annotate_figure(ggarrange(plot[[1]],plot[[2]],plot[[3]],plot[[4]],ncol = 2,
+                                nrow = 2,common.legend = TRUE,legend="right",
+                                labels = c("a)","b)","c)","d)"),font.label = list(size = 11)),
+                      bottom = text_grob("foraging trip start date",size=11),
+                      left = text_grob("distance from colony (km)", rot = 90,size=11)))
+```

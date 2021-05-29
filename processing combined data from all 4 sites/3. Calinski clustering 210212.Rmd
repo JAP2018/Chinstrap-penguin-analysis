@@ -1,0 +1,90 @@
+---
+title: "Calinski clustering"
+author: "Jessica Phillips"
+date: "March17, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+x<-c("vegan","dplyr","scales","ggpubr")
+lapply(x, require, character.only = TRUE)
+```
+
+
+```{r calinski}
+setwd("C:/Users/Jessica/Desktop/Chinstrap chapter April28 2020/analysis/3 chinstrap code Sept27 2019")
+
+allyear_dives<- read.csv("2. dives w stage 210212.csv")
+
+allyear_dives <- subset(allyear_dives,allyear_dives$stage!="creche")
+ 
+allyear_dives$bott_dist[is.na(allyear_dives$bott_dist)]<-0 #substitute NAs with zero
+allyear_dives$bott_dist<-as.numeric(allyear_dives$bott_dist)
+allyear_dives$bott_time[is.na(allyear_dives$bott_time)]<-0
+allyear_dives$bott_time<-as.numeric(allyear_dives$bott_time)
+
+mydata <- allyear_dives[c("duration","max_depth",'bott_time')] # select the needed rows
+
+#------------------------------Calinski criterion---------------------------------------------
+fit <- cascadeKM(scale(mydata, center = TRUE,  scale = TRUE), 2, 10, iter = 1000)
+
+calinski.best <- as.numeric(which.max(fit$results[2,]))
+cat("Calinski criterion optimal number of clusters:", calinski.best, "\n")
+plot(fit, sortg = TRUE, grpmts.plot = TRUE)
+
+fit<- kmeans(mydata, 3)
+
+new_data <- data.frame(mydata, fit$cluster)
+new_data$fit.cluster <- as.factor(new_data$fit.cluster)
+
+fit$centers
+```
+
+
+
+```{r behave to csv}
+vars_using<-allyear_dives[c("year","id","trip_num","max_depth","duration","bott_dist",
+                            "bott_time","start_time","sec2next","asc_desc_time","dayNight","stage","start_mass_kg","end_mass_kg")]
+
+vars_using$bott_dist[is.na(vars_using$bott_dist)]<-0 #substitute NAs with zero
+vars_using$bott_dist<-as.numeric(vars_using$bott_dist)
+vars_using$bott_time[is.na(vars_using$bott_time)]<-0
+vars_using$bott_time<-as.numeric(vars_using$bott_time)
+
+
+output<-list()
+for (i in 1:1){ 
+  if (i ==1){
+    now_using<-vars_using
+  }
+  if (i ==2){
+    now_using<-subset(vars_using,vars_using$dayNight=="day")
+  }
+  if (i ==3){
+    now_using<-subset(vars_using,vars_using$dayNight=="night")
+  }
+  for_cluster <- now_using[c("duration","max_depth",'bott_time')]
+  fit<- kmeans(for_cluster, 3)
+  with_cluster <- data.frame(now_using, fit$cluster)
+  with_cluster$fit.cluster <- as.factor(with_cluster$fit.cluster)
+  proportion<-table(with_cluster$fit.cluster)/length(with_cluster[,1])*100
+  output[[i]]<-cbind(fit$centers,proportion)
+} 
+output # [[1]] day and night, [[2]] day, [[3]] night
+
+newdata<-data.frame(output[[1]])
+newdata$org_num<-c(1,2,3)
+in_order<-newdata[order(newdata$duration),]
+
+mylist<-as.character(in_order$org_num)
+
+with_cluster$behavior[with_cluster$fit.cluster==mylist[1]]<-"travel"
+with_cluster$behavior[with_cluster$fit.cluster==mylist[2]]<-"search"
+with_cluster$behavior[with_cluster$fit.cluster==mylist[3]]<-"forage"
+with_cluster$fit.cluster<-NULL
+
+write.csv(file = "3. 4season_dive_behaviour 210212.csv", with_cluster)
+
+```
